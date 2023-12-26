@@ -1,0 +1,145 @@
+
+
+
+There are several methods and tools available to do this, such as kubeadm, minikube, and kops.
+setting up a basic cluster using kubeadm, which is a widely used tool for this purpose.
+
+Prerequisites:
+
+At least 2 Linux machines (1 master node and 1 worker node). Ensure that the machines can communicate with each other.
+
+Steps to Create a Kubernetes Cluster with kubeadm:
+1.Install Docker
+ Kubernetes requires a container runtime, and Docker is a popular choice.
+ 
+sudo apt update
+sudo apt install -y docker.io
+sudo systemctl enable docker
+sudo systemctl start docker
+
+
+2.Install kubeadm, kubelet, and kubectl:
+These are the main tools required to set up and manage a Kubernetes cluster.
+
+sudo apt-get update && sudo apt-get install -y apt-transport-https curl
+curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+echo "deb https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee -a /etc/apt/sources.list.d/kubernetes.list
+sudo apt-get update
+sudo apt-get install -y kubelet kubeadm kubectl
+sudo systemctl enable kubelet
+sudo systemctl start kubelet
+
+
+3.Initialize the Kubernetes Master Node:
+sudo kubeadm init --pod-network-cidr=10.244.0.0/16
+
+
+4.Set Up a Pod Network:
+A pod network is essential for pod-to-pod communication within the cluster. One popular choice is Calico.
+kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
+
+
+5.Join Worker Nodes:
+Once the master node is initialized, you'll receive a kubeadm join command to join worker nodes to the cluster.
+sudo kubeadm join <MASTER_IP>:<PORT> --token <TOKEN> --discovery-token-ca-cert-hash <HASH>
+
+6.Verify Cluster Setup:
+kubectl get nodes
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Deploying Apache Airflow on Kubernetes involves several steps. 
+Below is a step-by-step guide to deploying Airflow with PostgreSQL as a metadata database and using the KubernetesExecutor.
+
+
+several Kubernetes manifests for Airflow components and PostgreSQL.
+
+1.PersistentVolumeClaim (PVC) for PostgreSQL:
+The PersistentVolumeClaim (PVC) you've provided is a Kubernetes resource that allows you to request storage resources from a storage class, which can be dynamically provisioned based on the underlying infrastructure or provisioned statically in the cluster.
+Store the database data persistently.
+Create a PVC to persist PostgreSQL data.
+
+yaml.file
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+2.ConfigMap for Airflow Configuration:
+The ConfigMap in Kubernetes is a mechanism to decouple configuration artifacts from image content to keep containerized applications portable. It provides a way to inject configuration data into applications without changing the application's code
+
+Create a airflow-configmap.yaml:
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-configmap
+data:
+  airflow.cfg: |
+    [core]
+    dags_folder = /usr/local/airflow/dags
+    ...
+
+3.Secrets for PostgreSQL Credentials:
+In Kubernetes, Secrets are intended to hold sensitive information, such as passwords, OAuth tokens, and SSH keys. They provide a way to manage and control access to sensitive data separately from the application code or configuration.
+
+kubectl create secret generic postgres-credentials --from-literal=POSTGRES_PASSWORD=mysecretpassword
+
+4.Deployment and Service for PostgreSQL
+	Deployment for PostgreSQL:
+	a.Pod Specification
+	b.ReplicaSet
+	c.Updates and Rollbacks
+	
+	Service for PostgreSQL
+	a.ClusterIP Service
+	b.Stable Network Endpoint
+	c.Connection Pooling and Load Balancing
+
+5.Deployment for Airflow Webserver and Scheduler:
+ Ensure you have the DAGs and plugins volume mounts in your Airflow Deployment to access your DAGs and plugins.
+ a.Volume Mounts
+  In Kubernetes, a volume allows data to persist beyond the lifetime of individual pods. A volume mount is a way to link these volumes to specific paths within the container of a pod, effectively providing the container access to the volume's data.
+ b.Dag's
+ By using a volume mount, you ensure that the Airflow pods can access and execute these DAG scripts
+ c.Plugins: Airflow plugins extend its functionality. If you have custom plugins or additional operators, hooks, or executors, they need to be accessible to the Airflow components. Similar to DAGs, using a volume mount ensures that the Airflow pods can access and utilize these plugins
+ 
+ 
+6.Service for Airflow Webserver:
+Allow external access to the Airflow UI.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-webserver
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 8080
+      targetPort: 8080
+  selector:
+    component: airflow
+    role: webserver
+
+
+7.Deploy the Resources:
+kubectl apply -f <path-to-your-configs>
+
+
+8.Initialize Airflow Database:
+Once Airflow pods are running, initialize the metadata database:
+
+kubectl exec -it <airflow-webserver-pod-name> -- airflow db init
+
+9.Access Airflow UI:
+
+
+
+
